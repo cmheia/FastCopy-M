@@ -206,6 +206,7 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\shellext\Bitmap.cpp" />
     <ClCompile Include="src\shellext\shellext.cpp" />
   </ItemGroup>
   <ItemGroup>

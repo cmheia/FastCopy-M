@@ -63,8 +63,13 @@ public:
 	}
 };
 
-class ShellExt : public IContextMenu, IShellExtInit
+class ShellExt : public IContextMenu3, IShellExtInit
 {
+private:
+	DWORD m_winVer; //current windows version
+
+	STDMETHODIMP LoadShellIcon(int cx, int cy, HICON * phicon);
+
 protected:
 	ULONG		refCnt;
 	IDataObject	*dataObj;
@@ -72,7 +77,6 @@ protected:
 	PathArray	dstArray;
 	PathArray	clipArray;
 	BOOL		isCut;
-	HBITMAP		_bitmap;
 
 public:
 	ShellExt(void);
@@ -87,6 +91,9 @@ public:
 	STDMETHODIMP QueryContextMenu(HMENU hMenu, UINT iMenu, UINT cmdFirst, UINT cmdLast, UINT flg);
 	STDMETHODIMP InvokeCommand(CMINVOKECOMMANDINFO *info);
 	STDMETHODIMP GetCommandString(UINT_PTR cmd, UINT flg, UINT *, char *name, UINT cchMax);
+	STDMETHODIMP HandleMenuMsg(UINT uMsg, WPARAM wParam, LPARAM lParam) { return HandleMenuMsg2(uMsg, wParam, lParam, NULL); };
+	STDMETHODIMP HandleMenuMsg2(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT *plResult);
+
 	STDMETHODIMP_(ULONG) AddRef();
 	STDMETHODIMP_(ULONG) Release();
 };

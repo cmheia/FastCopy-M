@@ -12,6 +12,7 @@
 #include "../tlib/tlib.h"
 #include <olectl.h>
 #include "resource.h"
+#include "Bitmap.h"
 
 #pragma data_seg(".text")
 #define INITGUID
@@ -21,9 +22,11 @@
 #include "shellext.h"
 #pragma data_seg()
 
+#define WINVER_VISTA 0x600
+
 static ShellExtSystem	*SysObj = NULL;
 
-HINSTANCE g_hInstance = 0; //初始化Instance为0
+HINSTANCE _hModule = NULL; // DLL Module.
 
 // レジストリ登録キー（Ref: tortoise subversion）
 static char	*DllRegKeys[] = {
@@ -105,13 +108,22 @@ DWORD DbgLogW(WCHAR *fmt,...)
 =========================================================================*/
 
 ShellExt::ShellExt(void):
-	_bitmap(NULL)
+	m_winVer(0)
 {
 	refCnt = 0;
 	isCut = FALSE;
 	dataObj = NULL;
-	_bitmap = ::LoadBitmap(g_hInstance, MAKEINTRESOURCE(IDB_MENU_LOGO)); //从资源载入bmp
-	//_bitmap = (HBITMAP)::LoadImage(g_hInstance, MAKEINTRESOURCE(IDB_MENU_LOGO), IMAGE_BITMAP, 0, 0, LR_LOADTRANSPARENT); //从资源载入bmp
+
+	OSVERSIONINFOEX inf;
+	ZeroMemory(&inf, sizeof(OSVERSIONINFOEX));
+		inf.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+		GetVersionEx((OSVERSIONINFO *)&inf);
+	m_winVer = MAKEWORD(inf.dwMinorVersion, inf.dwMajorVersion);
+
+	if (m_winVer >= WINVER_VISTA) {
+		InitTheming();
+	}
+
 	if (SysObj)
 		SysObj->DllRefCnt++;
 	::CoInitialize(0);
@@ -119,8 +131,9 @@ ShellExt::ShellExt(void):
 
 ShellExt::~ShellExt()
 {
-	if (_bitmap != NULL)
-		DeleteObject(_bitmap); //删除bmp
+	if (m_winVer >= WINVER_VISTA) {
+		DeinitTheming();
+	}
 	if (dataObj)
 		dataObj->Release();
 	if (SysObj)
@@ -181,6 +194,12 @@ STDMETHODIMP ShellExt::QueryInterface(REFIID riid, void **ppv)
 	}
 	else if (IsEqualIID(riid, IID_IContextMenu)) {
 		*ppv = (IContextMenu *)this;
+	}
+	else if (IsEqualIID(riid, IID_IContextMenu2)) {
+		*ppv = (LPCONTEXTMENU2)this;
+	}
+	else if (IsEqualIID(riid, IID_IContextMenu3)) {
+		*ppv = (LPCONTEXTMENU3)this;
 	}
 
 	if (*ppv) {
@@ -249,9 +268,6 @@ STDMETHODIMP ShellExt::QueryContextMenu(HMENU hMenu, UINT iMenu, UINT cmdFirst, 
 	BOOL	is_submenu = (menu_flags & (is_dd ? SHEXT_SUBMENU_DD : SHEXT_SUBMENU_RIGHT));
 	BOOL	is_separator = (menu_flags & SHEXT_SUBMENU_NOSEP) ? FALSE : TRUE;
 
-	HBITMAP bitmap = NULL;
-	bitmap = _bitmap; //载入bmp
-
 	if (!is_dd && (flg == CMF_NORMAL) || (flg & (CMF_VERBSONLY|CMF_DEFAULTONLY))) {
 		return	ResultFromScode(MAKE_SCODE(SEVERITY_SUCCESS, 0, 0));
 	}
@@ -288,40 +304,80 @@ STDMETHODIMP ShellExt::QueryContextMenu(HMENU hMenu, UINT iMenu, UINT cmdFirst, 
 	if (mask_menu_flags && srcArray.Num() >= ((mask_menu_flags & SHEXT_RIGHT_PASTE) ? 0 : 1)) {
 //		DbgLogW(L"flg=%x isCut=%d mask_menu_flags=%x src=%d dst=%d clip=%d\r\n", flg, isCut,
 //			mask_menu_flags, srcArray.Num(), dstArray.Num(), clipArray.Num());
-		if (!is_dd && is_separator)
+		int insert = 1;
+		if (!is_dd && is_separator) {
 			::InsertMenu(hMenu, iMenu++, MF_SEPARATOR|MF_BYPOSITION, 0, 0);
-			::SetMenuItemBitmaps(hMenu, iMenu - 1, MF_BYPOSITION, bitmap, bitmap);
+			insert = -1;
+		}
 
-		if (is_separator)
+		if (is_separator) {
 			::InsertMenu(hMenu, iMenu, MF_SEPARATOR|MF_BYPOSITION, 0, 0);
-			::SetMenuItemBitmaps(hMenu, iMenu, MF_BYPOSITION, bitmap, bitmap);
+			insert = 0;
+		}
 
 		if (is_submenu) {
 			hTargetMenu = ::CreatePopupMenu();
 			::InsertMenu(hMenu, iMenu, MF_POPUP|MF_BYPOSITION, (LONG_PTR)hTargetMenu, FASTCOPY);
-			::SetMenuItemBitmaps(hMenu, iMenu, MF_BYPOSITION, bitmap, bitmap);
 			iMenu = 0;
+			insert = 0;
 		}
 
 		if (mask_menu_flags & SHEXT_RIGHT_PASTE) {
 			::InsertMenu(hTargetMenu, iMenu++, MF_STRING|MF_BYPOSITION,
 				cmdFirst + SHEXT_MENU_PASTE, GetLoadStr(IDS_RIGHTPASTE));
-			::SetMenuItemBitmaps(hTargetMenu, iMenu - 1, MF_BYPOSITION, bitmap, bitmap);
+			insert = -1;
 		}
 
 		if ((mask_menu_flags & (SHEXT_RIGHT_COPY|SHEXT_DD_COPY)) && srcArray.Num() > 0) {
 			::InsertMenu(hTargetMenu, iMenu++, MF_STRING|MF_BYPOSITION,
 				cmdFirst + SHEXT_MENU_COPY,
 				is_dd ? GetLoadStr(IDS_DDCOPY) : GetLoadStr(IDS_RIGHTCOPY));
-			::SetMenuItemBitmaps(hTargetMenu, iMenu - 1, MF_BYPOSITION, bitmap, bitmap);
+			insert = -1;
 		}
 
 		if ((mask_menu_flags & (SHEXT_RIGHT_DELETE|SHEXT_DD_MOVE)) && srcArray.Num() > 0) {
 			::InsertMenu(hTargetMenu, iMenu++, MF_STRING|MF_BYPOSITION,
 				cmdFirst + SHEXT_MENU_DELETE,
 				is_dd ? GetLoadStr(IDS_DDMOVE) : GetLoadStr(IDS_RIGHTDEL));
-			::SetMenuItemBitmaps(hTargetMenu, iMenu - 1, MF_BYPOSITION, bitmap, bitmap);
+			insert = -1;
 		}
+
+		if (1 != insert) {
+			insert += iMenu;
+			HBITMAP icon = NULL;
+			if (m_winVer >= WINVER_VISTA) {
+				HICON hicon;
+				DWORD menuIconWidth = GetSystemMetrics(SM_CXMENUCHECK);
+				DWORD menuIconHeight = GetSystemMetrics(SM_CYMENUCHECK);
+				HRESULT hr = LoadShellIcon(menuIconWidth, menuIconHeight, &hicon);
+				if (SUCCEEDED(hr)) {
+					icon = IconToBitmapPARGB32(hicon, menuIconWidth, menuIconHeight);
+				}
+			} else {
+				icon = HBMMENU_CALLBACK;
+			}
+
+			if (icon != NULL) {
+				MENUITEMINFO mii;
+				ZeroMemory(&mii, sizeof(mii));
+				mii.cbSize = sizeof(mii);
+				mii.fMask = MIIM_BITMAP;
+				mii.hbmpItem = icon;
+
+				SetMenuItemInfo(hMenu, insert, MF_BYPOSITION, &mii);
+
+				if (m_winVer >= WINVER_VISTA) {
+					MENUINFO MenuInfo;
+					MenuInfo.cbSize = sizeof(MenuInfo);
+					MenuInfo.fMask = MIM_STYLE;
+					MenuInfo.dwStyle = MNS_CHECKORBMP;
+
+					SetMenuInfo(hMenu, &MenuInfo);
+				}
+
+			}
+		}
+
 		SysObj->lastMenu = hMenu;
 		DbgLogW(L" added cnt=%d self=%x set menu=%x/%x\n",
 			SysObj->DllRefCnt, this, hMenu, SysObj->lastMenu);
@@ -434,6 +490,60 @@ STDMETHODIMP ShellExt::GetCommandString(UINT_PTR cmd, UINT flg, UINT *, char *na
     return E_INVALIDARG;
 }
 
+STDMETHODIMP ShellExt::HandleMenuMsg2(UINT uMsg, WPARAM /*wParam*/, LPARAM lParam, LRESULT *plResult)
+{
+	switch(uMsg) {
+
+		case WM_MEASUREITEM: {	//for owner drawn menu
+			MEASUREITEMSTRUCT * lpdis = (MEASUREITEMSTRUCT*) lParam;
+
+			if (lpdis == NULL) {
+				break;
+			}
+
+			lpdis->itemWidth = 0;
+			DWORD menuIconHeight = GetSystemMetrics(SM_CYMENUCHECK);
+			if (lpdis->itemHeight < menuIconHeight) {
+				lpdis->itemHeight = menuIconHeight;
+			}
+
+			if (plResult) {
+				*plResult = TRUE;
+			}
+			break; }
+
+		case WM_DRAWITEM: {
+			DRAWITEMSTRUCT * lpdis = (DRAWITEMSTRUCT*) lParam;
+			// not for a menu
+			if ((lpdis == NULL) || (lpdis->CtlType != ODT_MENU)) {
+				break;
+			}
+
+			HICON hicon = NULL;
+			DWORD menuIconWidth  = GetSystemMetrics(SM_CXMENUCHECK);
+			DWORD menuIconHeight = GetSystemMetrics(SM_CYMENUCHECK);
+			HRESULT hr = LoadShellIcon(menuIconWidth, menuIconHeight, &hicon);
+
+			if (SUCCEEDED(hr)) {
+				DWORD menuIconPadding = 2;	//+1 pixels on each side, is this fixed?
+
+				DrawIconEx(lpdis->hDC, menuIconPadding, menuIconPadding, hicon, menuIconWidth, menuIconHeight, 0, NULL, DI_NORMAL);
+				DestroyIcon(hicon);
+			}
+
+			if (plResult) {
+				*plResult = TRUE;
+			}
+
+			break; }
+
+		default:
+			break;
+	}
+
+	return S_OK;
+}
+
 STDMETHODIMP_(ULONG) ShellExt::AddRef()
 {
 	return ++refCnt;
@@ -448,6 +558,20 @@ STDMETHODIMP_(ULONG) ShellExt::Release()
 	return	0;
 }
 
+STDMETHODIMP ShellExt::LoadShellIcon(int cx, int cy, HICON * phicon) {
+	HRESULT hr = E_OUTOFMEMORY;
+	HICON hicon = (HICON)LoadImage(_hModule, MAKEINTRESOURCE(IDI_ICON_APP), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR);
+
+	if (hicon == NULL) {
+		hr = E_OUTOFMEMORY;
+		*phicon = NULL;
+	} else {
+		hr = S_OK;
+		*phicon = hicon;
+	}
+
+	return hr;
+}
 
 /*=========================================================================
   クラス ： ShellExtClassFactory
@@ -837,7 +961,7 @@ int APIENTRY DllMain(HINSTANCE hI, DWORD reason, PVOID)
 {
 	switch (reason) {
 	case DLL_PROCESS_ATTACH:
-		g_hInstance = (HINSTANCE)hI; //载入当前dll的instance
+		_hModule = hI;
 		if (SysObj == NULL)
 			SysObj = new ShellExtSystem(hI);
 		DbgLog("DLL_PROCESS_ATTACH\r\n");
