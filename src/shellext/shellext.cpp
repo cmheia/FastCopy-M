@@ -304,77 +304,104 @@ STDMETHODIMP ShellExt::QueryContextMenu(HMENU hMenu, UINT iMenu, UINT cmdFirst, 
 	if (mask_menu_flags && srcArray.Num() >= ((mask_menu_flags & SHEXT_RIGHT_PASTE) ? 0 : 1)) {
 //		DbgLogW(L"flg=%x isCut=%d mask_menu_flags=%x src=%d dst=%d clip=%d\r\n", flg, isCut,
 //			mask_menu_flags, srcArray.Num(), dstArray.Num(), clipArray.Num());
-		int insert = 1;
+		bool insert;
+		bool vista = (m_winVer >= WINVER_VISTA);
+		MENUINFO MenuInfo;
+		MENUITEMINFO mii;
+		HBITMAP icon = NULL;
+		if (m_winVer >= WINVER_VISTA) {
+			HICON hicon;
+			DWORD menuIconWidth = GetSystemMetrics(SM_CXMENUCHECK);
+			DWORD menuIconHeight = GetSystemMetrics(SM_CYMENUCHECK);
+			HRESULT hr = LoadShellIcon(menuIconWidth, menuIconHeight, &hicon);
+			if (SUCCEEDED(hr)) {
+				icon = IconToBitmapPARGB32(hicon, menuIconWidth, menuIconHeight);
+			}
+		} else {
+			icon = HBMMENU_CALLBACK;
+		}
+
+		if (icon != NULL) {
+			ZeroMemory(&mii, sizeof(mii));
+			mii.cbSize = sizeof(mii);
+			mii.fMask = MIIM_BITMAP;
+			mii.hbmpItem = icon;
+
+			// SetMenuItemInfo(hMenu, insert, MF_BYPOSITION, &mii);
+
+			if (vista) {
+				MenuInfo.cbSize = sizeof(MenuInfo);
+				MenuInfo.fMask = MIM_STYLE;
+				MenuInfo.dwStyle = MNS_CHECKORBMP;
+
+				// SetMenuInfo(hMenu, &MenuInfo);
+			}
+		}
+
 		if (!is_dd && is_separator) {
 			::InsertMenu(hMenu, iMenu++, MF_SEPARATOR|MF_BYPOSITION, 0, 0);
-			insert = -1;
+			if (icon != NULL) {
+				SetMenuItemInfo(hMenu, iMenu - 1, MF_BYPOSITION, &mii);
+				if (vista) {
+					SetMenuInfo(hMenu, &MenuInfo);
+				}
+			}
 		}
 
 		if (is_separator) {
 			::InsertMenu(hMenu, iMenu, MF_SEPARATOR|MF_BYPOSITION, 0, 0);
-			insert = 0;
+			if (icon != NULL) {
+				SetMenuItemInfo(hMenu, iMenu, MF_BYPOSITION, &mii);
+				if (vista) {
+					SetMenuInfo(hMenu, &MenuInfo);
+				}
+			}
 		}
 
 		if (is_submenu) {
 			hTargetMenu = ::CreatePopupMenu();
 			::InsertMenu(hMenu, iMenu, MF_POPUP|MF_BYPOSITION, (LONG_PTR)hTargetMenu, FASTCOPY);
+			if (icon != NULL) {
+				SetMenuItemInfo(hMenu, iMenu, MF_BYPOSITION, &mii);
+				if (vista) {
+					SetMenuInfo(hMenu, &MenuInfo);
+				}
+			}
 			iMenu = 0;
-			insert = 0;
 		}
 
 		if (mask_menu_flags & SHEXT_RIGHT_PASTE) {
 			::InsertMenu(hTargetMenu, iMenu++, MF_STRING|MF_BYPOSITION,
 				cmdFirst + SHEXT_MENU_PASTE, GetLoadStr(IDS_RIGHTPASTE));
-			insert = -1;
+			if (icon != NULL) {
+				SetMenuItemInfo(hMenu, iMenu - 1, MF_BYPOSITION, &mii);
+				if (vista) {
+					SetMenuInfo(hMenu, &MenuInfo);
+				}
+			}
 		}
 
 		if ((mask_menu_flags & (SHEXT_RIGHT_COPY|SHEXT_DD_COPY)) && srcArray.Num() > 0) {
 			::InsertMenu(hTargetMenu, iMenu++, MF_STRING|MF_BYPOSITION,
 				cmdFirst + SHEXT_MENU_COPY,
 				is_dd ? GetLoadStr(IDS_DDCOPY) : GetLoadStr(IDS_RIGHTCOPY));
-			insert = -1;
+			if (icon != NULL) {
+				SetMenuItemInfo(hMenu, iMenu - 1, MF_BYPOSITION, &mii);
+				if (vista) {
+					SetMenuInfo(hMenu, &MenuInfo);
+				}
+			}
 		}
 
 		if ((mask_menu_flags & (SHEXT_RIGHT_DELETE|SHEXT_DD_MOVE)) && srcArray.Num() > 0) {
 			::InsertMenu(hTargetMenu, iMenu++, MF_STRING|MF_BYPOSITION,
 				cmdFirst + SHEXT_MENU_DELETE,
 				is_dd ? GetLoadStr(IDS_DDMOVE) : GetLoadStr(IDS_RIGHTDEL));
-			insert = -1;
-		}
-
-		if (1 != insert) {
-			insert += iMenu;
-			HBITMAP icon = NULL;
-			if (m_winVer >= WINVER_VISTA) {
-				HICON hicon;
-				DWORD menuIconWidth = GetSystemMetrics(SM_CXMENUCHECK);
-				DWORD menuIconHeight = GetSystemMetrics(SM_CYMENUCHECK);
-				HRESULT hr = LoadShellIcon(menuIconWidth, menuIconHeight, &hicon);
-				if (SUCCEEDED(hr)) {
-					icon = IconToBitmapPARGB32(hicon, menuIconWidth, menuIconHeight);
-				}
-			} else {
-				icon = HBMMENU_CALLBACK;
-			}
-
 			if (icon != NULL) {
-				MENUITEMINFO mii;
-				ZeroMemory(&mii, sizeof(mii));
-				mii.cbSize = sizeof(mii);
-				mii.fMask = MIIM_BITMAP;
-				mii.hbmpItem = icon;
-
-				SetMenuItemInfo(hMenu, insert, MF_BYPOSITION, &mii);
-
-				if (m_winVer >= WINVER_VISTA) {
-					MENUINFO MenuInfo;
-					MenuInfo.cbSize = sizeof(MenuInfo);
-					MenuInfo.fMask = MIM_STYLE;
-					MenuInfo.dwStyle = MNS_CHECKORBMP;
-
+				SetMenuItemInfo(hMenu, iMenu - 1, MF_BYPOSITION, &mii);
+				if (vista) {
 					SetMenuInfo(hMenu, &MenuInfo);
 				}
-
 			}
 		}
 
