@@ -1,5 +1,5 @@
 ﻿======================================================================
-                   FastCopy  ver3.13                   2016/03/15
+                   FastCopy  ver3.22                   2016/10/03
                                                  SHIROUZU Hiroaki
                    FastCopy-M branch                2015/11/24
                                                  Mapaler
@@ -23,12 +23,10 @@
     The main window icon displayed animation when runing copy process. And allows to modify the total number of animation frames.
     
     Support use http url to replace "chm" help files.
-    
-    Shell Extension add icon.
 
 License:
 	-------------------------------------------------------------------------
-	 FastCopy ver3.0
+	 FastCopy ver3.2
 	 Copyright(C) 2004-2016 SHIROUZU Hiroaki All rights reserved.
 
 	 This program is free software. You can redistribute it and/or modify
@@ -45,3 +43,4 @@ Usage：
 
 Build:
 	VS2015 or later
+
