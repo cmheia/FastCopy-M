@@ -25,9 +25,9 @@
 #include "mainwinopt.h"
 
 #ifdef _WIN64
-#define FASTCOPY_TITLE		"FastCopy-M(64bit)"
+#define FASTCOPY_TITLE		"FastCopy(64bit)"
 #else
-#define FASTCOPY_TITLE		"FastCopy-M"
+#define FASTCOPY_TITLE		"FastCopy"
 #endif
 #define FASTCOPY_CLASS		"fastcopy_class"
 

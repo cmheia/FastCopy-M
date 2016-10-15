@@ -6,7 +6,6 @@
 	Update					: 2016-09-27(Tue)
 	Copyright				: H.Shirouzu
 	License					: GNU General Public License version 3
-	Modify					: Mapaler 2015-09-09
 	======================================================================== */
 
 #include "tlib/tlib.h"
@@ -39,8 +38,8 @@
 #define Attr(d) ((d)->dwFileAttributes)
 #define IsSymlink(d) (IsReparse((d)->dwFileAttributes) && (d)->dwReserved0==IO_REPARSE_TAG_SYMLINK)
 
-#define FASTCOPY			"FastCopy-M"
-#define FASTCOPYW			L"FastCopy-M"
+#define FASTCOPY			"FastCopy"
+#define FASTCOPYW			L"FastCopy"
 
 #define NTFS_STR			L"NTFS"
 #define FMT_RENAME			L"%.*s(%d)%s"

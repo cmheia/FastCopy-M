@@ -7,7 +7,6 @@
 	Update					: 2015-06-22(Mon)
 	Copyright				: H.Shirouzu
 	License					: GNU General Public License version 3
-	Modify					: Mapaler 2015-08-23
 	======================================================================== */
 
 #ifndef VERSION_H
@@ -17,7 +16,6 @@ void SetVersionStr(BOOL is_admin=FALSE, BOOL is_noui=FALSE);
 const char *GetVersionStr();
 const char *GetVerAdminStr();
 const char *GetCopyrightStr(void);
-const char *GetMenderStr(void);
 
 #endif
 
